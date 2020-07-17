@@ -3,14 +3,16 @@ var router = express.Router();
 var https = require("https");
 var xml2js = require("xml2js");
 var parser = new xml2js.Parser();
-var concat = require("concat-stream");
+
+var VerifyToken = require("../auth/VerifyToken");
+const verifyToken = require("../auth/VerifyToken");
 
 parser.on("error", function (err) {
   console.log("Parser error", err);
 });
 
 //gets top news
-router.get("/top", function (reqq, res) {
+router.get("/top", verifyToken, function (req, response) {
   //   var parseString = require("xml2js").parseString;
   //   var xml = `<?xml version="1.0" encoding="UTF-8" ?><business><company>Code Blog</company><owner>Nic Raboy</owner><employee><firstname>Nic</firstname><lastname>Raboy</lastname></employee><employee><firstname>Maria</firstname><lastname>Campos</lastname></employee></business>`;
   //   parseString(xml, function (err, result) {
@@ -18,8 +20,8 @@ router.get("/top", function (reqq, res) {
   //     res.send(result);
   //   });
 
-  let req = https.get(
-    "https://timesofindia.indiatimes.com/rssfeeds/296589292.cms",
+  https.get(
+    "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
     function (res) {
       let data = "";
       res.on("data", function (stream) {
@@ -28,7 +30,22 @@ router.get("/top", function (reqq, res) {
       res.on("end", function () {
         parser.parseString(data, function (error, result) {
           if (error === null) {
-            console.log(result.rss.channel[0].item);
+            var feed = result.rss.channel[0].item;
+            let news = [];
+            feed.map((obj) => {
+              let story = {};
+              let desc = JSON.stringify(obj.description[0]);
+              var cleanString = desc.replace(/\\n|\\r|\\|"/g, "").trim();
+              story["title"] = obj.title[0];
+              story["desc"] = cleanString;
+              story["link"] = obj.link[0];
+              if (typeof obj.category !== "undefined") {
+                story["category"] = obj.category[0];
+              }
+              story["pubDate"] = obj.pubDate[0];
+              news.push(story);
+            });
+            response.send(news);
           } else {
             console.log(error);
           }
