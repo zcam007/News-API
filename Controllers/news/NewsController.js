@@ -3,6 +3,7 @@ var router = express.Router();
 var https = require("https");
 var xml2js = require("xml2js");
 var parser = new xml2js.Parser();
+const rateLimit = require("express-rate-limit");
 
 const verifyToken = require("../auth/VerifyToken");
 
@@ -10,6 +11,15 @@ parser.on("error", function (err) {
   console.log("Parser error", err);
 });
 
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minutes
+  max: 5,
+  message: {
+    error: "Too many requests",
+  },
+  statusCode: 429, // 429 status = Too Many Requests (RFC 6585)
+  skipFailedRequests: true, // Do not count failed requests (status >= 400)
+});
 //TOP NEWS ROUTE
 //feed from IndiaTimes
 router.get("/top", verifyToken, function (req, response) {
@@ -50,7 +60,7 @@ router.get("/top", verifyToken, function (req, response) {
 
 //india news
 //news feed from THE HINDU
-router.get("/india", verifyToken, function (req, response) {
+router.get("/india", verifyToken, apiLimiter, function (req, response) {
   https.get(
     "https://www.thehindu.com/news/national/feeder/default.rss",
     function (res) {
